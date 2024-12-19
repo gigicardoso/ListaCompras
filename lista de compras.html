@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Compras</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f7f6;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 600px;
+        }
+
+        /* Estilo dos botões */
+        .btn-primary {
+            background-color: #3498db;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #2ecc71;
+            border: none;
+        }
+
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        /* Estilo da lista de produtos */
+        .list-group-item {
+            background-color: #f8f9fa;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        .comprado {
+            text-decoration: line-through;
+            color: grey;
+            background-color: #ecf0f1 !important;
+        }
+
+        /* Alerta */
+        #alertaProdutoDuplicado {
+            background-color: #e74c3c;
+            color: white;
+            font-weight: bold;
+            border: none;
+        }
+
+        /* Total */
+        #total {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Página de Login -->
+<div class="container mt-5" id="loginContainer">
+    <h1 class="text-center">Login</h1>
+    <form id="formLogin" class="mt-4">
+        <div class="input-group mb-3">
+            <input type="text" id="nomeUsuario" class="form-control" placeholder="Nome do usuário" aria-label="Nome do usuário">
+            <button class="btn btn-primary" type="submit">Entrar</button>
+        </div>
+    </form>
+</div>
+
+<!-- Página de Compras -->
+<div class="container mt-5 d-none" id="comprasContainer">
+    <h1 class="text-center">Lista de Compras</h1>
+    <h3 class="text-center">Bem-vindo, <span id="nomeExibido"></span>!</h3>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <form id="formProduto">
+                <div class="input-group mb-3">
+                    <input type="text" id="produto" class="form-control" placeholder="Adicionar produto" aria-label="Adicionar produto">
+                    <input type="number" id="preco" class="form-control ms-2" placeholder="Preço" step="0.01" aria-label="Preço">
+                    <input type="text" id="descricao" class="form-control ms-2" placeholder="Descrição" aria-label="Descrição">
+                    <input type="url" id="imagemUrl" class="form-control ms-2" placeholder="URL da imagem" aria-label="URL da imagem">
+                    <button class="btn btn-primary" type="submit">Adicionar</button>
+                </div>
+            </form>
+            <ul class="list-group" id="listaProdutos"></ul>
+            <div class="alert alert-danger mt-3 d-none" id="alertaProdutoDuplicado">
+                Produto já está na lista!
+            </div>
+            <div class="mt-3">
+                <span>Total: R$ <span id="total">0.00</span></span>
+            </div>
+            <button class="btn btn-warning mt-3" id="limparListaBtn">Limpar Lista</button>
+            <button class="btn btn-danger mt-3" id="logoutBtn">Sair</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Produtos pré-cadastrados
+const produtosPreCadastrados = [
+    { nome: 'Arroz', preco: 5.00, descricao: 'Pacote de 1kg de arroz branco', imagemUrl: 'arroz.jpg' },
+    { nome: 'Feijão', preco: 4.50, descricao: 'Pacote de 1kg de feijão carioca', imagemUrl: 'feijão.jpg' },
+    { nome: 'Óleo de Cozinha', preco: 7.00, descricao: 'Garrafa de 900ml de óleo de soja', imagemUrl: 'oleo.webp' }
+];
+
+// Função para inicializar produtos no localStorage, caso não haja produtos salvos
+function inicializarProdutos() {
+    if (!localStorage.getItem('produtos')) {
+        localStorage.setItem('produtos', JSON.stringify(produtosPreCadastrados));
+    }
+}
+
+// Referências aos elementos
+const loginContainer = document.getElementById('loginContainer');
+const comprasContainer = document.getElementById('comprasContainer');
+const nomeExibido = document.getElementById('nomeExibido');
+const formLogin = document.getElementById('formLogin');
+const nomeUsuarioInput = document.getElementById('nomeUsuario');
+const formProduto = document.getElementById('formProduto');
+const listaProdutos = document.getElementById('listaProdutos');
+const alertaProdutoDuplicado = document.getElementById('alertaProdutoDuplicado');
+const totalElement = document.getElementById('total');
+const logoutBtn = document.getElementById('logoutBtn');
+const limparListaBtn = document.getElementById('limparListaBtn');
+
+// Verifica se o usuário está logado e exibe a tela correta
+const usuarioLogado = localStorage.getItem('usuario');
+if (usuarioLogado) {
+    nomeExibido.textContent = usuarioLogado;
+    loginContainer.classList.add('d-none');
+    comprasContainer.classList.remove('d-none');
+}
+
+// Array de produtos carregado do localStorage ou inicializado vazio
+let produtos = JSON.parse(localStorage.getItem('produtos')) || [];
+let total = 0;
+
+// Formata um valor numérico para o formato de moeda (R$)
+function formatarMoeda(valor) {
+    return valor.toFixed(2).replace('.', ',');
+}
+
+// Calcula o total com base nos produtos no localStorage
+function calcularTotal() {
+    total = produtos.reduce((acc, produto) => acc + produto.preco, 0);
+    atualizarTotal();
+}
+
+// Atualiza o valor total na interface
+function atualizarTotal() {
+    totalElement.textContent = formatarMoeda(total);
+    localStorage.setItem('total', total.toString());
+}
+
+// Adiciona um produto visualmente à lista e recalcula o total
+function adicionarProdutoNaLista(produto) {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.innerHTML = `
+        <div>
+            <img src="${produto.imagemUrl}" alt="Imagem do produto" style="width: 50px; height: 50px; margin-right: 10px;">
+            <span>${produto.nome} - R$ ${formatarMoeda(produto.preco)}</span><br>
+            <small>${produto.descricao}</small>
+        </div>
+    `;
+
+    const btnRemover = document.createElement('button');
+    btnRemover.className = 'btn btn-danger btn-sm me-2';
+    btnRemover.textContent = 'Remover';
+    btnRemover.addEventListener('click', function() {
+        produtos = produtos.filter(p => p.nome !== produto.nome);
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+        listaProdutos.removeChild(li);
+        calcularTotal();
+    });
+
+    const btnComprado = document.createElement('button');
+    btnComprado.className = 'btn btn-success btn-sm';
+    btnComprado.textContent = 'Comprado';
+    btnComprado.addEventListener('click', function() {
+        li.classList.toggle('comprado');
+    });
+
+    const buttonGroup = document.createElement('div');
+    buttonGroup.appendChild(btnComprado);
+    buttonGroup.appendChild(btnRemover);
+
+    li.appendChild(buttonGroup);
+    listaProdutos.appendChild(li);
+
+    calcularTotal();
+}
+
+// Carrega os produtos do localStorage e os exibe na interface
+function carregarProdutos() {
+    produtos = JSON.parse(localStorage.getItem('produtos')) || [];
+    produtos.forEach(adicionarProdutoNaLista);
+}
+
+// Inicializa os produtos pré-cadastrados e carrega a lista ao abrir a página
+inicializarProdutos();
+carregarProdutos();
+calcularTotal();
+
+// Evento de login
+formLogin.addEventListener('submit', function(event) {
+    event.preventDefault();
+    const nomeUsuario = nomeUsuarioInput.value.trim();
+    if (nomeUsuario) {
+        localStorage.setItem('usuario', nomeUsuario);
+        nomeExibido.textContent = nomeUsuario;
+        loginContainer.classList.add('d-none');
+        comprasContainer.classList.remove('d-none');
+        carregarProdutos();  // Carrega produtos ao fazer login
+    }
+});
+
+// Adiciona novos produtos à lista
+formProduto.addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    const nome = document.getElementById('produto').value.trim();
+    const preco = parseFloat(document.getElementById('preco').value.trim());
+    const descricao = document.getElementById('descricao').value.trim();
+    const imagemUrl = document.getElementById('imagemUrl').value.trim();
+
+    // Verifica se o produto já existe na lista
+    if (produtos.some(p => p.nome.toLowerCase() === nome.toLowerCase())) {
+        alertaProdutoDuplicado.classList.remove('d-none');
+        setTimeout(() => {
+            alertaProdutoDuplicado.classList.add('d-none');
+        }, 3000);  // Oculta o alerta após 3 segundos
+        formProduto.reset();
+        return;
+    }
+
+    if (nome && !isNaN(preco) && preco > 0) {
+        const novoProduto = { nome, preco, descricao, imagemUrl };
+        produtos.push(novoProduto);
+        localStorage.setItem('produtos', JSON.stringify(produtos));
+        adicionarProdutoNaLista(novoProduto);
+        formProduto.reset();
+    }
+});
+
+// Limpa toda a lista e redefine o total
+limparListaBtn.addEventListener('click', function() {
+    listaProdutos.innerHTML = '';
+    produtos = [];
+    total = 0;
+    atualizarTotal();
+    localStorage.removeItem('produtos');
+    localStorage.removeItem('total');
+});
+
+// Função de logout
+logoutBtn.addEventListener('click', function() {
+    localStorage.removeItem('usuario');
+    window.location.reload();
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
